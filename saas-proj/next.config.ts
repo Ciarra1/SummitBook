@@ -1,6 +1,10 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // THIS IS THE MAGIC LINE THAT FIXES VERCEL/NETLIFY 404s
+  outputFileTracingRoot: path.join(__dirname), 
+  
   experimental: {
     serverActions: {
       allowedOrigins: ["localhost:3000", "app.saas-proj.dev"],
@@ -14,9 +18,9 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'lckpglsjyurwcuilycky.supabase.co', // <-- Replaced placeholder with your actual ID
+        hostname: 'lckpglsjyurwcuilycky.supabase.co',
         port: '',
-        pathname: '/storage/v1/object/public/**', // Best practice: limits access to your public storage buckets
+        pathname: '/storage/v1/object/public/**',
       },
     ],
   },
