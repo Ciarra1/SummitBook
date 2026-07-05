@@ -61,13 +61,8 @@ export default function SignupPage() {
       }
       await supabase.auth.signOut();
 
-      fetch('/api/email-handler', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, firstName }),
-      }).catch((err) => console.error('Welcome email failed:', err));
-
-      router.push('/verify-email');
+      // Route directly to the sign in page
+      router.push('/signin');
     } catch (err) {
       console.error('Signup error:', err);
       setError(err instanceof Error ? err.message : 'Signup failed');
