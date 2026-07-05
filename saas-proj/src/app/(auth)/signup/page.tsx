@@ -1,6 +1,6 @@
 // app/signup/page.tsx
 import { Suspense } from 'react';
-import SignupPage from './SignupPage'; // move the component to a separate file
+import SignupPage from './singuppage'; // move the component to a separate file
 
 export default function Page() {
   return (
