@@ -1,0 +1,145 @@
+// SaaS-Proj Database Schema for dbdiagram.io (SIMPLIFIED)
+// Copy this entire content into https://dbdiagram.io/d
+// 
+// Tables Overview (8 core tables):
+// - Authentication: users, organizer_profiles
+// - Business: expeditions
+// - Transactions: bookings, payments
+// - Social: reviews
+// - Operations: notifications
+
+Table users {
+  id UUID [pk]
+  email VARCHAR(255) [unique, not null]
+  password_hash VARCHAR(255)
+  first_name VARCHAR(100) [not null]
+  last_name VARCHAR(100) [not null]
+  profile_picture_url TEXT
+  phone_number VARCHAR(20)
+  phone_verified BOOLEAN [default: false]
+  role TEXT [not null, note: "'hiker', 'organizer', 'admin'"]
+  email_verified BOOLEAN [default: false]
+  last_login_at TIMESTAMP
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+  deleted_at TIMESTAMP [note: "Soft delete"]
+}
+
+Table organizer_profiles {
+  id UUID [pk]
+  user_id UUID [unique, not null, ref: - users.id]
+  company_name VARCHAR(255) [not null]
+  company_registration_number VARCHAR(100)
+  verification_status TEXT [default: "'pending'", note: "'pending', 'verified', 'rejected'"]
+  average_rating DECIMAL(3,2) [default: 0]
+  total_reviews INTEGER [default: 0]
+  bio TEXT
+  bank_account_details JSONB [note: "Encrypted for payouts"]
+  cancellation_policy TEXT
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+}
+
+Table expeditions {
+  id UUID [pk]
+  organizer_id UUID [not null, ref: > organizer_profiles.id]
+  mountain_name VARCHAR(255) [not null]
+  difficulty_level TEXT [not null, note: "'beginner', 'intermediate', 'advanced'"]
+  start_date DATE [not null]
+  end_date DATE [not null]
+  total_van_slots INTEGER [not null]
+  booked_slots INTEGER [default: 0, note: "Updated via trigger on booking"]
+  price_per_person DECIMAL(10,2) [not null]
+  title VARCHAR(255)
+  description TEXT
+  itinerary TEXT [note: "Day-by-day activities (simple text)"]
+  included_amenities TEXT [note: "Comma-separated or array"]
+  gear_requirements TEXT [note: "Comma-separated list"]
+  is_published BOOLEAN [default: false]
+  is_cancelled BOOLEAN [default: false]
+  cancellation_reason TEXT
+  latitude DECIMAL(10,8)
+  longitude DECIMAL(11,8)
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+}
+
+Table bookings {
+  id UUID [pk]
+  hiker_id UUID [not null, ref: > users.id]
+  expedition_id UUID [not null, ref: > expeditions.id]
+  booking_status TEXT [default: "'pending'", note: "'pending', 'confirmed', 'cancelled'"]
+  payment_status TEXT [default: "'pending'", note: "'pending', 'completed', 'failed', 'refunded'"]
+  final_price DECIMAL(10,2) [not null]
+  paymongo_payment_id UUID [ref: > payments.id]
+  payment_method TEXT [note: "'gcash', 'maya', 'instapay'"]
+  
+  // Participant info (merged from expedition_participants)
+  participant_name VARCHAR(255) [not null]
+  participant_email VARCHAR(255)
+  participant_phone VARCHAR(20)
+  emergency_contact_name VARCHAR(255)
+  emergency_contact_phone VARCHAR(20)
+  medical_conditions TEXT [note: "Brief notes about allergies, conditions"]
+  
+  booking_date TIMESTAMP [default: 'NOW()']
+  payment_completed_at TIMESTAMP
+  cancellation_requested_at TIMESTAMP
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+}
+
+Table payments {
+  id UUID [pk]
+  booking_id UUID [not null, ref: > bookings.id]
+  paymongo_payment_id TEXT [unique, not null]
+  paymongo_source_id TEXT
+  amount DECIMAL(10,2) [not null]
+  currency TEXT [default: "'PHP'"]
+  payment_status TEXT [not null, note: "'pending', 'succeeded', 'failed', 'cancelled'"]
+  payment_method_type TEXT [note: "'gcash', 'maya', etc."]
+  last_four_digits VARCHAR(4)
+  idempotency_key VARCHAR(255) [unique, not null]
+  webhook_received_at TIMESTAMP
+  webhook_event_type TEXT
+  platform_fee DECIMAL(10,2) [default: 0]
+  refund_amount DECIMAL(10,2) [default: 0]
+  refunded_at TIMESTAMP
+  failure_reason TEXT
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+}
+
+Table reviews {
+  id UUID [pk]
+  expedition_id UUID [not null, ref: > expeditions.id]
+  hiker_id UUID [not null, ref: > users.id]
+  organizer_id UUID [not null, ref: > organizer_profiles.id]
+  rating INTEGER [not null, note: "1-5"]
+  review_text TEXT
+  verified_participant BOOLEAN [default: false]
+  is_approved BOOLEAN [default: true]
+  created_at TIMESTAMP [default: 'NOW()']
+  updated_at TIMESTAMP [default: 'NOW()']
+}
+
+Table notifications {
+  id UUID [pk]
+  recipient_id UUID [not null, ref: > users.id]
+  notification_type TEXT [not null, note: "'booking_confirmation', 'payment_receipt', 'reminder', 'cancellation'"]
+  title VARCHAR(255) [not null]
+  message TEXT [not null]
+  booking_id UUID [ref: > bookings.id]
+  expedition_id UUID [ref: > expeditions.id]
+  status TEXT [default: "'pending'", note: "'pending', 'sent', 'failed'"]
+  sent_at TIMESTAMP
+  created_at TIMESTAMP [default: 'NOW()']
+}
+
+// Indexes for performance
+// Key indexes:
+// - users: (email), (role)
+// - expeditions: (organizer_id), (start_date), (mountain_name)
+// - bookings: (hiker_id), (expedition_id), (payment_status)
+// - payments: (booking_id), (paymongo_payment_id)
+// - reviews: (expedition_id), (organizer_id)
