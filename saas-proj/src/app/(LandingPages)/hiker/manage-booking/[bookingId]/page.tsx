@@ -5,6 +5,8 @@ import { useState, useRef, useEffect, use } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+// Make sure to install jspdf: npm install jspdf
+import { jsPDF } from "jspdf"; 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,14 +14,12 @@ interface BookingFormData {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   medical_conditions: string;
-  date_of_birth: string;
-  age: number | null;
-  sex: string;
   med_certificate: File | null;
   valid_id: File | null;
   signed_waiver: File | null;
   parent_consent: File | null;
   waiver_acknowledged: boolean;
+  is_minor: boolean; // Added manual toggle to replace birthdate calculation
 }
 
 interface Booking {
@@ -30,14 +30,15 @@ interface Booking {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   medical_conditions: string | null;
-  date_of_birth: string | null;
-  age: number | null;
-  sex: string | null;
   booking_status: string;
   payment_status: string;
   final_price: number;
   booking_date: string;
   expedition_id: string;
+  valid_id_url: string | null;
+  medical_certificate_url: string | null;
+  signed_waiver_url: string | null;
+  parent_consent_url: string | null;
 }
 
 // ─── Downloadable template PDFs ───────────────────────────────────────────────
@@ -48,16 +49,6 @@ const DOCUMENT_TEMPLATES = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getHikerAge(birthdate: string | null): number | null {
-  if (!birthdate) return null;
-  const today = new Date();
-  const dob = new Date(birthdate);
-  let age = today.getFullYear() - dob.getFullYear();
-  const m = today.getMonth() - dob.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-  return age;
-}
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -217,7 +208,6 @@ export default function page({
   const router = useRouter();
 
   const [booking, setBooking] = useState<Booking | null>(null);
-  const [hikerAge, setHikerAge] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -227,14 +217,12 @@ export default function page({
     emergency_contact_name: "",
     emergency_contact_phone: "",
     medical_conditions: "",
-    date_of_birth: "",
-    age: null,
-    sex: "",
     med_certificate: null,
     valid_id: null,
     signed_waiver: null,
     parent_consent: null,
     waiver_acknowledged: false,
+    is_minor: false,
   });
 
   useEffect(() => {
@@ -267,21 +255,8 @@ export default function page({
           emergency_contact_name: bookingData.emergency_contact_name ?? "",
           emergency_contact_phone: bookingData.emergency_contact_phone ?? "",
           medical_conditions: bookingData.medical_conditions ?? "",
-          date_of_birth: bookingData.date_of_birth ?? "",
-          age: bookingData.age ?? null,
-          sex: bookingData.sex ?? "",
         }));
 
-        const { data: userData } = await supabase
-          .from("users")
-          .select("birthdate")
-          .eq("id", user.id)
-          .single();
-
-        const initialDob = bookingData.date_of_birth ?? userData?.birthdate ?? null;
-        if (initialDob) {
-          setHikerAge(getHikerAge(initialDob));
-        }
       } catch (err) {
         setErrorMsg("Something went wrong loading your booking.");
       } finally {
@@ -328,7 +303,8 @@ export default function page({
       setErrorMsg("Signed waiver is required.");
       return;
     }
-    if (hikerAge !== null && hikerAge < 18 && !form.parent_consent) {
+    // Validation using the new manual toggle state
+    if (form.is_minor && !form.parent_consent) {
       setErrorMsg("Parent/guardian consent form is required for hikers under 18.");
       return;
     }
@@ -360,9 +336,6 @@ export default function page({
           emergency_contact_name: form.emergency_contact_name.trim(),
           emergency_contact_phone: form.emergency_contact_phone.trim(),
           medical_conditions: form.medical_conditions.trim() || null,
-          date_of_birth: form.date_of_birth || null,
-          age: form.age ?? null,
-          sex: form.sex || null,
           medical_certificate_url: medCertUrl,
           valid_id_url: validIdUrl,
           signed_waiver_url: waiverUrl,
@@ -382,6 +355,73 @@ export default function page({
       setSaving(false);
     }
   }
+
+  // ─── PDF Generation Function ──────────────────────────────────────────────────
+  const generatePDF = () => {
+    if (!booking) return;
+
+    const doc = new jsPDF();
+    const margin = 15;
+    let y = 20;
+
+    // Title
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Participant Booking Information", margin, y);
+    
+    y += 15;
+    
+    // Personal Info Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Personal Information", margin, y);
+    
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    
+    const personalInfo = [
+      `Full Name: ${booking.participant_name || "N/A"}`,
+      `Phone Number: ${booking.participant_phone || "N/A"}`,
+      `Email Address: ${booking.participant_email || "N/A"}`,
+      `Emergency Contact Name: ${booking.emergency_contact_name || form.emergency_contact_name || "N/A"}`,
+      `Emergency Contact Phone: ${booking.emergency_contact_phone || form.emergency_contact_phone || "N/A"}`,
+      `Medical Conditions: ${booking.medical_conditions || form.medical_conditions || "None"}`
+    ];
+
+    personalInfo.forEach(text => {
+      doc.text(text, margin, y);
+      y += 7;
+    });
+
+    y += 10;
+
+    // Documents Section
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Documents", margin, y);
+
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+
+    // We split URLs so they don't run off the page
+    const addDocumentText = (label: string, url: string | null | undefined) => {
+      const text = `${label}: ${url ? url : "Not uploaded yet"}`;
+      const splitText = doc.splitTextToSize(text, 180);
+      doc.text(splitText, margin, y);
+      y += (splitText.length * 6) + 2; 
+    };
+
+    addDocumentText("Valid ID", booking.valid_id_url);
+    addDocumentText("Medical Certificate", booking.medical_certificate_url);
+    addDocumentText("Signed Waiver", booking.signed_waiver_url);
+    addDocumentText("Parent Consent", booking.parent_consent_url || "Not Required");
+
+    // Save PDF
+    const filename = `${booking.participant_name.replace(/\s+/g, '_')}_Booking_Info.pdf`;
+    doc.save(filename);
+  };
 
 
   if (loading) {
@@ -421,8 +461,6 @@ export default function page({
       </div>
     );
   }
-
-  const isMinor = hikerAge !== null && hikerAge < 18;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -471,9 +509,22 @@ export default function page({
               </p>
               <p className="text-sm font-mono text-stone-600">{booking.id.slice(0, 8).toUpperCase()}</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            
+            <div className="flex gap-2 flex-wrap items-center">
               <StatusPill status={booking.booking_status} />
               <StatusPill status={booking.payment_status} />
+              
+              {/* PDF GENERATION BUTTON */}
+              <button
+                onClick={generatePDF}
+                className="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-stone-800 text-white hover:bg-stone-700 transition-colors"
+                type="button"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                PDF Summary
+              </button>
             </div>
           </div>
 
@@ -500,7 +551,7 @@ export default function page({
             </div>
           </div>
 
-          {isMinor && (
+          {form.is_minor && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
               <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -512,58 +563,6 @@ export default function page({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
-          <section className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h2 className="text-base font-bold text-stone-800">Hiker Details</h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>Date of birth</FieldLabel>
-                <input
-                  type="date"
-                  value={form.date_of_birth}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      date_of_birth: e.target.value,
-                      age: getHikerAge(e.target.value),
-                    }))
-                  }
-                  className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3.5 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-                />
-              </div>
-
-              <div>
-                <FieldLabel>Age</FieldLabel>
-                <input
-                  type="number"
-                  value={form.age ?? ''}
-                  readOnly
-                  className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3.5 py-2.5 text-sm text-stone-800"
-                />
-              </div>
-            </div>
-
-            <div>
-              <FieldLabel>Sex</FieldLabel>
-              <select
-                value={form.sex}
-                onChange={(e) => setForm((f) => ({ ...f, sex: e.target.value }))}
-                className="w-full rounded-xl border border-stone-300 bg-stone-50 px-3.5 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
-              >
-                <option value="">Select sex</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-            </div>
-          </section>
 
           <section className="bg-white rounded-2xl border border-stone-200 p-5 space-y-4">
             <div className="flex items-center gap-2 mb-1">
@@ -665,7 +664,24 @@ export default function page({
               downloadLabel="Download waiver template (PDF)"
             />
 
-            {isMinor && (
+            {/* Manual Minor Toggle */}
+            <div className="flex items-start gap-3 pt-3">
+              <input
+                id="is_minor"
+                type="checkbox"
+                checked={form.is_minor}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, is_minor: e.target.checked }))
+                }
+                className="mt-0.5 h-4 w-4 rounded border-stone-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+              />
+              <label htmlFor="is_minor" className="text-sm font-medium text-stone-700 cursor-pointer">
+                The participant is under 18 years old
+                <span className="block text-xs font-normal text-stone-400 mt-0.5">Check this box to upload the required Parent/Guardian consent form.</span>
+              </label>
+            </div>
+
+            {form.is_minor && (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-3">
                 <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
                   Under-18 requirement

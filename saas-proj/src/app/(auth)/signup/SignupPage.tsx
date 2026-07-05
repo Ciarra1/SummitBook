@@ -19,36 +19,10 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<'hiker' | 'organizer'>(initialRole);
   const [companyName, setCompanyName] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [age, setAge] = useState<number | null>(null);
-  const [sex, setSex] = useState<'Male' | 'Female' | ''>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createBrowserSupabaseClient();
-
-  const getAgeFromDate = (value: string) => {
-    if (!value) return null;
-
-    const today = new Date();
-    const dob = new Date(value);
-
-    if (Number.isNaN(dob.getTime())) return null;
-
-    let calculatedAge = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      calculatedAge -= 1;
-    }
-
-    return calculatedAge;
-  };
-
-  const handleDateOfBirthChange = (value: string) => {
-    setDateOfBirth(value);
-    setAge(getAgeFromDate(value));
-  };
 
   const handleSignup = async (e: React.FormEvent) => {
     console.log('handleSignup fired');
@@ -73,9 +47,6 @@ export default function SignupPage() {
             first_name: firstName,
             last_name: lastName,
             role,
-            date_of_birth: dateOfBirth || null,
-            age: age ?? null,
-            sex: sex || null,
             ...(role === 'organizer' && { company_name: companyName }),
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
@@ -165,47 +136,6 @@ export default function SignupPage() {
           className="w-full px-4 py-2 border rounded"
           required
         />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Date of birth
-            </label>
-            <input
-              type="date"
-              value={dateOfBirth}
-              onChange={(e) => handleDateOfBirthChange(e.target.value)}
-              className="w-full px-4 py-2 border rounded"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-              Age
-            </label>
-            <input
-              type="number"
-              value={age ?? ''}
-              readOnly
-              className="w-full px-4 py-2 border rounded bg-gray-50"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Sex
-          </label>
-          <select
-            value={sex}
-            onChange={(e) => setSex(e.target.value as 'Male' | 'Female' | '')}
-            className="w-full px-4 py-2 border rounded"
-          >
-            <option value="">Select sex</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-          </select>
-        </div>
 
         <input
           type="password"

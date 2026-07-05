@@ -44,9 +44,6 @@ export type Booking = {
   final_price: number;
   participant_name: string;
   participant_phone?: string;
-  date_of_birth?: string | null;
-  age?: number | null;
-  sex?: "Male" | "Female" | null;
   created_at: string;
 };
 

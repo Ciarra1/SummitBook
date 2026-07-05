@@ -20,7 +20,7 @@ export default function ManageExpeditionPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("published");
   const [sortKey, setSortKey] = useState<SortKey>("updated");
 
   const [pendingId, setPendingId] = useState<string | null>(null);

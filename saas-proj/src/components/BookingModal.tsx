@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { useRouter } from 'next/navigation';
 interface BookingModalProps {
@@ -26,56 +26,10 @@ export default function BookingModal({ isOpen, onClose, expedition, hiker}: Book
       const router = useRouter();
   // 1. Changed state to track the hiker's phone number, pre-filled if available
   const [phoneNumber, setPhoneNumber] = useState(hiker.phone || '');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [age, setAge] = useState<number | null>(null);
-  const [sex, setSex] = useState<'Male' | 'Female' | ''>('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const loadSavedProfileData = async () => {
-      const supabase = createBrowserSupabaseClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      const metadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
-
-      const savedDob = typeof metadata.date_of_birth === 'string' ? metadata.date_of_birth : '';
-      const savedAge = metadata.age;
-      const savedSex = metadata.sex;
-
-      setDateOfBirth(savedDob);
-      setAge(typeof savedAge === 'number' ? savedAge : typeof savedAge === 'string' ? Number(savedAge) : null);
-      setSex(savedSex === 'Male' || savedSex === 'Female' ? savedSex : '');
-    };
-
-    loadSavedProfileData();
-  }, [isOpen]);
-
   if (!isOpen) return null;
-
-  const getAgeFromDate = (value: string) => {
-    if (!value) return null;
-
-    const today = new Date();
-    const dob = new Date(value);
-
-    if (Number.isNaN(dob.getTime())) return null;
-
-    let calculatedAge = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      calculatedAge -= 1;
-    }
-
-    return calculatedAge;
-  };
-
-  const handleDateOfBirthChange = (value: string) => {
-    setDateOfBirth(value);
-    setAge(getAgeFromDate(value));
-  };
 
   const handleConfirm = async () => {
     // 2. Updated validation
@@ -98,9 +52,6 @@ export default function BookingModal({ isOpen, onClose, expedition, hiker}: Book
         participant_name: hiker.name,
         participant_email: hiker.email,
         participant_phone: phoneNumber, // Saved here!
-        date_of_birth: dateOfBirth || null,
-        age: age ?? null,
-        sex: sex || null,
     };
 
     try {
@@ -174,6 +125,7 @@ export default function BookingModal({ isOpen, onClose, expedition, hiker}: Book
         {/* Required Inputs & Details */}
         <div className="space-y-4 mb-6">
           <div>
+            {/* 4. Updated Label and Input binding */}
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Your Mobile Number</label>
             <input 
               type="text" 
@@ -182,40 +134,6 @@ export default function BookingModal({ isOpen, onClose, expedition, hiker}: Book
               className="w-full mt-1.5 p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-600 focus:border-green-600 outline-none transition-all" 
               placeholder="e.g. +63 912 345 6789" 
             />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date of Birth</label>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => handleDateOfBirthChange(e.target.value)}
-                className="w-full mt-1.5 p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-600 focus:border-green-600 outline-none transition-all"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Age</label>
-              <input
-                type="number"
-                value={age ?? ''}
-                readOnly
-                className="w-full mt-1.5 p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-700"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sex</label>
-            <select
-              value={sex}
-              onChange={(e) => setSex(e.target.value as 'Male' | 'Female' | '')}
-              className="w-full mt-1.5 p-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-600 focus:border-green-600 outline-none transition-all"
-            >
-              <option value="">Select sex</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-            </select>
           </div>
           
           {/* Read-Only Display */}
