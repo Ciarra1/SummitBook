@@ -193,7 +193,7 @@ export default async function ExpeditionDetailPage({
           {/* ════════════════════════════════════════════════════════════════
               LEFT — sticky info card
           ════════════════════════════════════════════════════════════════ */}
-          <aside className="w-full lg:w-64 xl:w-72 shrink-0 lg:sticky lg:top-8">
+          <aside className="w-full lg:w-64 xl:w-72 shrink-0 lg:sticky lg:top-8 z-50">
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
               {/* Name + price header */}
@@ -324,13 +324,13 @@ export default async function ExpeditionDetailPage({
 
             </div>
 
-            {/* Gallery — sits below the white card */}
-            {gallery.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-[15px] font-bold text-gray-900 mb-4">Gallery</h3>
-                <GalleryCollage gallery={gallery} name={exp.mountain_name} />
-              </div>
-            )}
+         {/* Gallery — sits below the white card */}
+          {gallery.length > 0 && (
+            <div className="mt-8 relative z-0">
+              <h3 className="text-[15px] font-bold text-gray-900 mb-4">Gallery</h3>
+              <GalleryCollage gallery={gallery} name={exp.mountain_name} />
+            </div>
+          )}
 
           </div>
           {/* end RIGHT */}
